@@ -14,11 +14,13 @@ QMAKE_CXXFLAGS += -std=c++17
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    duplicates_scanner.cpp \
-    file_counter.cpp
+    file_counter.cpp \
+    file_indexer.cpp \
+    file_index.cpp
 
 HEADERS  += mainwindow.h \
-    duplicates_scanner.h \
-    file_counter.h
+    file_counter.h \
+    file_indexer.h \
+    file_index.h
 
 FORMS    += mainwindow.ui

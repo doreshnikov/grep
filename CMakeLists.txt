@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(fdupes)
+project(grep)
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -11,16 +11,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 find_package(Qt5Widgets REQUIRED)
 
-add_executable(fdupes main.cpp mainwindow.cpp file_counter.cpp duplicates_scanner.cpp)
-add_executable(tests tests/tests.cpp duplicates_scanner.cpp)
-set_target_properties(tests
-	PROPERTIES
-	ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tests"
-	EXECUTABLE_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tests"
-	RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tests"
-	LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/tests"
-)
+add_executable(grep main.cpp mainwindow.cpp file_counter.cpp file_indexer.cpp file_index.cpp)
 
-qt5_use_modules(fdupes Widgets)
-qt5_use_modules(tests Widgets)
+qt5_use_modules(grep Widgets)
 include_directories("${PROJECT_SOURCE_DIR}/cmake-build-debug")

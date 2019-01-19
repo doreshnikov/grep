@@ -1,13 +1,14 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "file_index.h"
+
 #include <memory>
 #include <QMainWindow>
 #include <QMap>
 #include <QThread>
 #include <QFileInfo>
 #include <QFileInfoList>
-
 #include <QtWidgets>
 
 namespace Ui {
@@ -17,38 +18,44 @@ namespace Ui {
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
-    bool deleteOneSelected(QString const &, QString const &, QMessageBox::StandardButton &);
-
 public:
 
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-private slots:
+public slots:
 
     void selectDirectory();
-    void deleteSelected();
-    void startScanning();
-    void stopScanning();
+    void startIndexing();
+    void stopIndexing();
+    void startSearching();
+    void stopSearching();
 
     void showAboutDialog();
 
-    void onCounted(int, qint64);
+    void onCountComplete(QString const &, int, qint64);
+    void onIndexComplete(QString const &);
 
-    void receiveProgress(QString const &);
-    void receiveDuplicatesBucket(QVector<QString> const &);
+    void receiveIndexedFile(QString const &, file_index const &);
     void receiveError(QString const &);
-
-    void interruptWorker();
 
 private:
 
-    std::unique_ptr<Ui::MainWindow> ui;
-    QString _dir;
-    QMap<QString, QTreeWidgetItem *> _duplicates;
-    QMap<QString, qint64> _duplicates_count;
+    QThread *requestNewThread();
+    void interruptWorkers();
 
-    QThread *_workerThread;
+    void updateStatusBar();
+    void resetButtonIndex();
+
+    std::unique_ptr<Ui::MainWindow> ui;
+    QHash<QString, QListWidgetItem *> _dirs;
+
+    QHash<QString, file_index> _file_indexes;
+
+    QHash<QString, int> _unindexed_dirs;
+    int _unindexed_amount;
+
+    QVector<QThread *> _workerThreads;
 
 };
 

@@ -2,22 +2,21 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 tests/Makefile
-tests/300difftest/
 
 *.o
 moc_*
-fdupes.pro.*
-fdupes_automoc.cpp
+grep.pro.*
+grep_automoc.cpp
 ui_mainwindow.h
 tests/moc_*
 tests/tests.pro.*
 
-fdupes
-fdupes.exe
+grep
+grep.exe
 tests/tests
 tests/tests.exe
 tests/tmp/
-fdupes_autogen/
+grep_autogen/
 tests_autogen/
 tests/tests_autogen/
 cmake_install.cmake
@@ -25,3 +24,4 @@ cmake_install.cmake
 .git/
 .idea/
 .qmake.stash
+tests/.qmake.stash

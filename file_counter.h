@@ -15,7 +15,7 @@ public:
 
 signals:
 
-    void onComplete(int, qint64);
+    void onComplete(QString, int, qint64);
 
 public slots:
 

@@ -26,6 +26,6 @@ void file_counter::startCounting() {
         }
     }
 
-    emit onComplete(amount, size);
+    emit onComplete(_root.absolutePath(), amount, size);
     QThread::currentThread()->quit();
 }
