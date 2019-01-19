@@ -44,6 +44,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
             this, &MainWindow::startIndexing);
     connect(ui->buttonSearch, &QPushButton::clicked,
             this, &MainWindow::startSearching);
+
+    resetButtonIndex();
 }
 
 void MainWindow::interruptWorkers() {
