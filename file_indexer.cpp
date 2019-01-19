@@ -18,7 +18,7 @@ void file_indexer::startIndexing() {
 
         if (file_info.isFile()) {
             emit onFileIndexed(file_info.absoluteFilePath(), file_index());
-            QThread::currentThread()->sleep(1);
+//            QThread::currentThread()->sleep(1);
         }
     }
 

@@ -127,7 +127,7 @@
       </column>
       <column>
        <property name="text">
-        <string>Size</string>
+        <string>Instances</string>
        </property>
       </column>
      </widget>

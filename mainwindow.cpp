@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "file_counter.h"
 #include "file_indexer.h"
+#include "string_finder.h"
 
 #include <QCommonStyle>
 #include <QDesktopWidget>
@@ -24,6 +25,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->progressBar->reset();
 
     qRegisterMetaType<file_index>("file_index");
+    qRegisterMetaType<QVector<QPair<quint64, QString>>>("QVector<QPair<quint64, QString>>");
     QCommonStyle style;
     ui->action_About->setIcon(style.standardIcon(QCommonStyle::SP_DialogHelpButton));
 
@@ -65,11 +67,10 @@ QThread *MainWindow::requestNewThread() {
 }
 
 void MainWindow::selectDirectory() {
-    QString _dir = QFileDialog::getExistingDirectoryUrl(this, "Please select a directory for indexing", QString(), QFileDialog::ShowDirsOnly).fileName();
-    if (_dir == "" || _dir.isNull()) {
+    QString _dir = QFileDialog::getExistingDirectoryUrl(this, "Please select a directory for indexing", QString(), QFileDialog::ShowDirsOnly).path();
+    if (_dir == "" || _dir.isNull() || _dirs.contains(_dir)) {
         return;
     }
-
     _unindexed_dirs.insert(_dir, 0);
 
     ui->buttonIndex->setDisabled(true);
@@ -77,6 +78,7 @@ void MainWindow::selectDirectory() {
     ui->buttonSearch->setDisabled(true);
     ui->buttonSearch->repaint();
 
+    ui->action_Select_Directory->setDisabled(true);
     ui->statusBar->showMessage(QString("Counting files..."));
 
     interruptWorkers();
@@ -139,6 +141,8 @@ void MainWindow::onCountComplete(QString const &dir, int amount, qint64 size) {
     ui->buttonIndex->repaint();
     ui->buttonSearch->setDisabled(false);
     ui->buttonSearch->repaint();
+
+    ui->action_Select_Directory->setDisabled(false);
 }
 
 void MainWindow::startIndexing() {
@@ -193,11 +197,11 @@ void MainWindow::stopIndexing() {
 }
 
 void MainWindow::onIndexComplete(QString const &dir) {
-    _unindexed_dirs.remove(dir);
     if (_dirs[dir] != nullptr) {
         _dirs[dir]->setTextColor(QColor(0, 50, 0));
         _unindexed_amount -= _unindexed_dirs[dir];
     }
+    _unindexed_dirs.remove(dir);
     if (_unindexed_dirs.empty()) {
         ui->buttonIndex->setDisabled(true);
         stopIndexing();
@@ -216,11 +220,31 @@ void MainWindow::startSearching() {
     connect(ui->buttonSearch, &QPushButton::clicked,
             this, &MainWindow::stopSearching);
 
+    QString substring = ui->lineEdit->text();
+    ui->plainTextEdit_Error->appendPlainText(substring);
+
+    QThread *workerThread = requestNewThread();
+    string_finder *finder = new string_finder(_file_indexes, substring);
+    finder->moveToThread(workerThread);
+
+    connect(workerThread, &QThread::started,
+            finder, &string_finder::startScanning);
+    connect(finder, &string_finder::onInstanceLocated,
+            this, &MainWindow::receiveInstance);
+    connect(finder, &string_finder::onError,
+            this, &MainWindow::receiveError);
+    connect(finder, &string_finder::onComplete,
+            this, &MainWindow::onSearchComplete);
+    connect(workerThread, &QThread::finished,
+            finder, &QObject::deleteLater);
+
+    workerThread->start();
+
     ui->statusBar->showMessage(QString("Searching ..."));
 }
 
 void MainWindow::stopSearching() {
-//    interruptWorkers();
+    interruptWorkers();
 
     ui->buttonSearch->setText("Start searching");
     ui->buttonSearch->repaint();
@@ -233,10 +257,25 @@ void MainWindow::stopSearching() {
     resetButtonIndex();
 }
 
+void MainWindow::onSearchComplete() {
+    stopSearching();
+}
+
 void MainWindow::receiveIndexedFile(const QString &file_name, const file_index &index) {
     ui->progressBar->setValue(ui->progressBar->value() + 1);
     _file_indexes.insert(file_name, index);
-    ui->plainTextEdit_Error->appendPlainText(QString::number(index.get_id()));
+}
+
+void MainWindow::receiveInstance(const QString &file_name, const QVector<QPair<quint64, QString>> &positions) {
+    QTreeWidgetItem *item = new QTreeWidgetItem(ui->treeWidget);
+    item->setText(0, file_name);
+    item->setText(1, QString::number(positions.size()));
+
+    for (auto const &pos : positions) {
+        QTreeWidgetItem *child = new QTreeWidgetItem(item);
+        child->setText(0, pos.second);
+        child->setText(1, QString::number(pos.first));
+    }
 }
 
 void MainWindow::receiveError(QString const &error) {

@@ -16,11 +16,13 @@ SOURCES += main.cpp\
         mainwindow.cpp \
     file_counter.cpp \
     file_indexer.cpp \
-    file_index.cpp
+    file_index.cpp \
+    string_finder.cpp
 
 HEADERS  += mainwindow.h \
     file_counter.h \
     file_indexer.h \
-    file_index.h
+    file_index.h \
+    string_finder.h
 
 FORMS    += mainwindow.ui

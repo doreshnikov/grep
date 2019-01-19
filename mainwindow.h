@@ -27,17 +27,20 @@ public slots:
 
     void selectDirectory();
     void startIndexing();
-    void stopIndexing();
     void startSearching();
-    void stopSearching();
 
-    void showAboutDialog();
+    void stopIndexing();
+    void stopSearching();
 
     void onCountComplete(QString const &, int, qint64);
     void onIndexComplete(QString const &);
+    void onSearchComplete();
 
     void receiveIndexedFile(QString const &, file_index const &);
+    void receiveInstance(QString const &, QVector<QPair<quint64, QString>> const &);
     void receiveError(QString const &);
+
+    void showAboutDialog();
 
 private:
 
