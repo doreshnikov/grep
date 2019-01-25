@@ -30,6 +30,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->action_About->setIcon(style.standardIcon(QCommonStyle::SP_DialogHelpButton));
 
     ui->treeWidget->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    ui->treeWidget->header()->setSectionResizeMode(1, QHeaderView::Fixed);
     ui->treeWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
     ui->treeWidget->setUniformRowHeights(true);
 
