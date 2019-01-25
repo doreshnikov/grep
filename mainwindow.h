@@ -36,24 +36,24 @@ public slots:
     void onIndexComplete(QString const &);
     void onSearchComplete();
 
-    void receiveIndexedFile(QString const &, file_index const &);
-    void receiveInstance(QString const &, QVector<QPair<quint64, QString>> const &);
+    void receiveIndexedFile(file_index const &);
+    void receiveInstances(QString const &, QVector<QString> const &);
     void receiveError(QString const &);
 
     void showAboutDialog();
 
 private:
 
-    QThread *requestNewThread();
-    void interruptWorkers();
+    QThread *request_new_thread();
+    void interrupt_workers();
 
-    void updateStatusBar();
-    void resetButtonIndex();
+    void update_status_bar();
+    void reset_index_button();
 
     std::unique_ptr<Ui::MainWindow> ui;
     QHash<QString, QListWidgetItem *> _dirs;
 
-    QHash<QString, file_index> _file_indexes;
+    QVector<file_index> _file_indexes;
 
     QHash<QString, int> _unindexed_dirs;
     int _unindexed_amount;

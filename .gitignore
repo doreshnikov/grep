@@ -13,6 +13,7 @@ tests/tests.pro.*
 
 grep
 grep.exe
+tests/test
 tests/tests
 tests/tests.exe
 tests/tmp/

@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->progressBar->reset();
 
     qRegisterMetaType<file_index>("file_index");
-    qRegisterMetaType<QVector<QPair<quint64, QString>>>("QVector<QPair<quint64, QString>>");
+    qRegisterMetaType<QVector<QString>>("QVector<QString>");
     QCommonStyle style;
     ui->action_About->setIcon(style.standardIcon(QCommonStyle::SP_DialogHelpButton));
 
@@ -45,10 +45,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(ui->buttonSearch, &QPushButton::clicked,
             this, &MainWindow::startSearching);
 
-    resetButtonIndex();
+    connect(ui->lineEdit, &QLineEdit::returnPressed,
+            ui->buttonSearch, &QPushButton::click);
+
+    reset_index_button();
 }
 
-void MainWindow::interruptWorkers() {
+void MainWindow::interrupt_workers() {
     for (auto &workerThread : _workerThreads) {
         if (workerThread != nullptr) {
             if (workerThread->isRunning()) {
@@ -62,7 +65,7 @@ void MainWindow::interruptWorkers() {
     _workerThreads.clear();
 }
 
-QThread *MainWindow::requestNewThread() {
+QThread *MainWindow::request_new_thread() {
     QThread *thread = new QThread();
     _workerThreads.append(thread);
     return thread;
@@ -83,8 +86,8 @@ void MainWindow::selectDirectory() {
     ui->action_Select_Directory->setDisabled(true);
     ui->statusBar->showMessage(QString("Counting files..."));
 
-    interruptWorkers();
-    QThread *workerThread = requestNewThread();
+    interrupt_workers();
+    QThread *workerThread = request_new_thread();
 
     file_counter *counter = new file_counter(_dir);
     counter->moveToThread(workerThread);
@@ -95,6 +98,9 @@ void MainWindow::selectDirectory() {
     connect(workerThread, &QThread::finished,
             counter, &QObject::deleteLater);
 
+    disconnect(ui->lineEdit, &QLineEdit::returnPressed,
+               ui->buttonSearch, &QPushButton::click);
+
     workerThread->start();
 
     ui->progressBar->setMaximum(0);
@@ -102,10 +108,10 @@ void MainWindow::selectDirectory() {
 }
 
 void MainWindow::showAboutDialog() {
-    QMessageBox::about(this, "fdupes", "Files duplicates finder utility");
+    QMessageBox::about(this, "grep", "Files substring searcher with indexing and modification subscription");
 }
 
-void MainWindow::updateStatusBar() {
+void MainWindow::update_status_bar() {
     if (_unindexed_amount == 0) {
         ui->statusBar->showMessage(QString("Indexed files: %1").arg(_file_indexes.size()));
     } else if (_file_indexes.size() == 0) {
@@ -115,7 +121,7 @@ void MainWindow::updateStatusBar() {
     }
 }
 
-void MainWindow::resetButtonIndex() {
+void MainWindow::reset_index_button() {
     if (_unindexed_dirs.empty()) {
         ui->buttonIndex->setDisabled(true);
     } else {
@@ -133,16 +139,18 @@ void MainWindow::onCountComplete(QString const &dir, int amount, qint64 size) {
     _unindexed_amount += amount;
     _unindexed_dirs[dir] = amount;
 
-    updateStatusBar();
+    update_status_bar();
     ui->progressBar->setValue(0);
     ui->progressBar->setMaximum(_unindexed_amount == 0 ? 1 : _unindexed_amount);
 
-    interruptWorkers();
+    interrupt_workers();
 
     ui->buttonIndex->setDisabled(false);
     ui->buttonIndex->repaint();
     ui->buttonSearch->setDisabled(false);
     ui->buttonSearch->repaint();
+    connect(ui->lineEdit, &QLineEdit::returnPressed,
+            ui->buttonSearch, &QPushButton::click);
 
     ui->action_Select_Directory->setDisabled(false);
 }
@@ -156,12 +164,14 @@ void MainWindow::startIndexing() {
                this, &MainWindow::startIndexing);
     connect(ui->buttonIndex, &QPushButton::clicked,
             this, &MainWindow::stopIndexing);
+    disconnect(ui->lineEdit, &QLineEdit::returnPressed,
+               ui->buttonSearch, &QPushButton::click);
 
     ui->buttonSearch->setDisabled(true);
     ui->buttonSearch->repaint();
 
     for (auto const &dir : _dirs.keys()) {
-        QThread *workerThread = requestNewThread();
+        QThread *workerThread = request_new_thread();
         file_indexer *indexer = new file_indexer(dir);
         indexer->moveToThread(workerThread);
 
@@ -182,7 +192,7 @@ void MainWindow::startIndexing() {
 }
 
 void MainWindow::stopIndexing() {
-    interruptWorkers();
+    interrupt_workers();
 
     ui->buttonIndex->setText("Start indexing");
     ui->buttonIndex->repaint();
@@ -191,11 +201,13 @@ void MainWindow::stopIndexing() {
     disconnect(ui->buttonIndex, &QPushButton::clicked,
             this, &MainWindow::stopIndexing);
 
-    updateStatusBar();
+    update_status_bar();
     ui->progressBar->setValue(0);
 
     ui->buttonSearch->setDisabled(false);
     ui->buttonSearch->repaint();
+    connect(ui->lineEdit, &QLineEdit::returnPressed,
+            ui->buttonSearch, &QPushButton::click);
 }
 
 void MainWindow::onIndexComplete(QString const &dir) {
@@ -214,6 +226,8 @@ void MainWindow::startSearching() {
     ui->buttonIndex->setDisabled(true);
     ui->buttonIndex->repaint();
 
+    ui->treeWidget->clear();
+
     ui->buttonSearch->setText("Abort searching");
     ui->buttonSearch->repaint();
 
@@ -223,16 +237,14 @@ void MainWindow::startSearching() {
             this, &MainWindow::stopSearching);
 
     QString substring = ui->lineEdit->text();
-    ui->plainTextEdit_Error->appendPlainText(substring);
-
-    QThread *workerThread = requestNewThread();
+    QThread *workerThread = request_new_thread();
     string_finder *finder = new string_finder(_file_indexes, substring);
     finder->moveToThread(workerThread);
 
     connect(workerThread, &QThread::started,
             finder, &string_finder::startScanning);
-    connect(finder, &string_finder::onInstanceLocated,
-            this, &MainWindow::receiveInstance);
+    connect(finder, &string_finder::onInstancesFound,
+            this, &MainWindow::receiveInstances);
     connect(finder, &string_finder::onError,
             this, &MainWindow::receiveError);
     connect(finder, &string_finder::onComplete,
@@ -246,7 +258,7 @@ void MainWindow::startSearching() {
 }
 
 void MainWindow::stopSearching() {
-    interruptWorkers();
+    interrupt_workers();
 
     ui->buttonSearch->setText("Start searching");
     ui->buttonSearch->repaint();
@@ -255,28 +267,29 @@ void MainWindow::stopSearching() {
     disconnect(ui->buttonSearch, &QPushButton::clicked,
                this, &MainWindow::stopSearching);
 
-    updateStatusBar();
-    resetButtonIndex();
+    update_status_bar();
+    reset_index_button();
 }
 
 void MainWindow::onSearchComplete() {
     stopSearching();
 }
 
-void MainWindow::receiveIndexedFile(const QString &file_name, const file_index &index) {
+void MainWindow::receiveIndexedFile(const file_index &index) {
     ui->progressBar->setValue(ui->progressBar->value() + 1);
-    _file_indexes.insert(file_name, index);
+    if (!index.empty()) {
+        _file_indexes.append(index);
+    }
 }
 
-void MainWindow::receiveInstance(const QString &file_name, const QVector<QPair<quint64, QString>> &positions) {
+void MainWindow::receiveInstances(const QString &file_name, const QVector<QString> &where) {
     QTreeWidgetItem *item = new QTreeWidgetItem(ui->treeWidget);
     item->setText(0, file_name);
-    item->setText(1, QString::number(positions.size()));
+    item->setText(1, QString::number(where.size()));
 
-    for (auto const &pos : positions) {
+    for (QString const &line : where) {
         QTreeWidgetItem *child = new QTreeWidgetItem(item);
-        child->setText(0, pos.second);
-        child->setText(1, QString::number(pos.first));
+        child->setText(0, line);
     }
 }
 
@@ -285,5 +298,5 @@ void MainWindow::receiveError(QString const &error) {
 }
 
 MainWindow::~MainWindow() {
-    interruptWorkers();
+    interrupt_workers();
 }

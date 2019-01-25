@@ -2,24 +2,33 @@
 #define FILE_INDEX_H
 
 #include <QObject>
+#include <QString>
+#include <QVector>
+
+#include <set>
 
 class file_index {
 
 public:
 
     file_index();
+    file_index(QString const &);
     ~file_index();
 
-    file_index(file_index const &) = default;
-    file_index &operator=(file_index const &) = default;
+    QString const &get_file_path() const;
 
-    quint64 get_id() const;
+    void insert(quint32);
+    bool contains(quint32) const;
+    std::size_t size() const;
+    bool empty() const;
+    void clear();
 
-    static quint64 ID;
+    static quint32 get_trigram(unsigned char, unsigned char, unsigned char);
 
 private:
 
-    quint64 _id;
+    QString _file_path;
+    std::set<quint32> _trigrams;
 
 };
 

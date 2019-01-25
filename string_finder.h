@@ -13,12 +13,12 @@ class string_finder : public QObject {
 
 public:
 
-    string_finder(QHash<QString, file_index> const &, QString const &);
+    string_finder(QVector<file_index> const &, QString const &);
     ~string_finder();
 
 signals:
 
-    void onInstanceLocated(QString const &, QVector<QPair<quint64, QString>> const &);
+    void onInstancesFound(QString const &, QVector<QString> const &);
 
     void onComplete();
     void onError(QString const &);
@@ -26,6 +26,13 @@ signals:
 public slots:
 
     void startScanning();
+
+private:
+
+    void scan_file(QString const &);
+
+    QVector<file_index> const &_indexes;
+    QString _substring;
 
 };
 

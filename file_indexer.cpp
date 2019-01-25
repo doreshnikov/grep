@@ -1,7 +1,9 @@
 #include "file_indexer.h"
 
+#include <QSet>
 #include <QThread>
 #include <QDirIterator>
+#include <QTextStream>
 
 file_indexer::file_indexer(QString const &dir) : _root(dir) {}
 
@@ -17,8 +19,9 @@ void file_indexer::startIndexing() {
         QFileInfo file_info(it.next());
 
         if (file_info.isFile()) {
-            emit onFileIndexed(file_info.absoluteFilePath(), file_index());
-//            QThread::currentThread()->sleep(1);
+            file_index index(file_info.absoluteFilePath());
+            index_file(index);
+            emit onFileIndexed(index);
         }
     }
 
@@ -27,4 +30,40 @@ void file_indexer::startIndexing() {
     }
 
     QThread::currentThread()->quit();
+}
+
+void file_indexer::index_file(file_index &index) {
+    QFile file(index.get_file_path());
+
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        char buffer[BUFFER_SIZE];
+        std::size_t start = 0, end = 0;
+
+        while ((end = start + file.read(buffer + start, BUFFER_SIZE - start)) != start) {
+            if (start == 0) {
+                start = 2;
+            }
+            for (std::size_t i = 0; i < end - 3; i++) {
+                if (buffer[i] == '\0') {
+                    index.clear();
+                    return;
+                }
+
+                index.insert(file_index::get_trigram(buffer[i], buffer[i + 1], buffer[i + 2]));
+                if (QThread::currentThread()->isInterruptionRequested()) {
+                    index.clear();
+                    return;
+                }
+            }
+
+            buffer[0] = buffer[end - 2];
+            buffer[1] = buffer[end - 1];
+
+            if (index.size() > BINARY_INDEX_SIZE) {
+                index.clear();
+            }
+        }
+    } else {
+        emit onError(QString("can't open file %1").arg(index.get_file_path()));
+    }
 }
