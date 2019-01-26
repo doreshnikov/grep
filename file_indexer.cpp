@@ -62,7 +62,6 @@ void file_indexer::index_file(file_index &index) {
                     index.clear();
                     return;
                 }
-
                 index.insert(file_index::get_trigram(buffer[i], buffer[i + 1], buffer[i + 2]));
             }
 

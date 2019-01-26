@@ -5,7 +5,7 @@
 #include <QString>
 #include <QVector>
 
-#include <set>
+#include <unordered_set>
 
 class file_index {
 
@@ -28,7 +28,7 @@ public:
 private:
 
     QString _file_path;
-    std::set<quint32> _trigrams;
+    std::unordered_set<quint32> _trigrams;
 
 };
 
