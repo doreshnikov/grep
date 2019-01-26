@@ -8,25 +8,33 @@
 file_indexer::file_indexer(QString const &dir) : _root(dir) {}
 
 void file_indexer::startIndexing() {
-    QDirIterator it(_root.absolutePath(), QDir::Hidden | QDir::NoDotAndDotDot | QDir::Files, QDirIterator::Subdirectories);
-    bool finished = true;
+    if (QFileInfo(_root.absolutePath()).isFile()) {
+        file_index index(_root.absolutePath());
+        index_file(index);
+        emit onFileIndexed(index);
 
-    while (it.hasNext()) {
-        if (QThread::currentThread()->isInterruptionRequested()) {
-            finished = false;
-            break;
+        emit onComplete("");
+    } else {
+        QDirIterator it(_root.absolutePath(), QDir::Hidden | QDir::NoDotAndDotDot | QDir::Files, QDirIterator::Subdirectories);
+        bool finished = true;
+
+        while (it.hasNext()) {
+            if (QThread::currentThread()->isInterruptionRequested()) {
+                finished = false;
+                break;
+            }
+            QFileInfo file_info(it.next());
+
+            if (file_info.isFile()) {
+                file_index index(file_info.absoluteFilePath());
+                index_file(index);
+                emit onFileIndexed(index);
+            }
         }
-        QFileInfo file_info(it.next());
 
-        if (file_info.isFile()) {
-            file_index index(file_info.absoluteFilePath());
-            index_file(index);
-            emit onFileIndexed(index);
+        if (finished) {
+            emit onComplete(_root.absolutePath());
         }
-    }
-
-    if (finished) {
-        emit onComplete(_root.absolutePath());
     }
 
     QThread::currentThread()->quit();

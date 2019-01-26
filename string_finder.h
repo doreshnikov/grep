@@ -13,7 +13,7 @@ class string_finder : public QObject {
 
 public:
 
-    string_finder(QVector<file_index> const &, QString const &);
+    string_finder(QHash<QString, file_index> const &, QString const &);
     ~string_finder();
 
 signals:
@@ -31,7 +31,7 @@ private:
 
     void scan_file(QString const &);
 
-    QVector<file_index> const &_indexes;
+    QHash<QString, file_index> const &_indexes;
     QString _substring;
 
 };

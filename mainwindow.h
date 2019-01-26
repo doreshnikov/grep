@@ -2,13 +2,16 @@
 #define MAINWINDOW_H
 
 #include "file_index.h"
+#include "watcher.h"
 
+#include <mutex>
 #include <memory>
 #include <QMainWindow>
 #include <QMap>
 #include <QThread>
 #include <QFileInfo>
 #include <QFileInfoList>
+
 #include <QtWidgets>
 
 namespace Ui {
@@ -36,9 +39,15 @@ public slots:
     void onIndexComplete(QString const &);
     void onSearchComplete();
 
+    void onFileChanged(QString const &);
+    void onDirectoryChanged(QString const &);
+
     void receiveIndexedFile(file_index const &);
+    void receiveReindexedFile(file_index const &);
     void receiveInstances(QString const &, QVector<QString> const &);
     void receiveError(QString const &);
+
+    void removeDirectory(QListWidgetItem *);
 
     void showAboutDialog();
 
@@ -49,16 +58,19 @@ private:
 
     void update_status_bar();
     void reset_index_button();
+    void reindex(QString const &);
 
     std::unique_ptr<Ui::MainWindow> ui;
     QHash<QString, QListWidgetItem *> _dirs;
 
-    QVector<file_index> _file_indexes;
-
+    QHash<QString, file_index> _file_indexes;
+    std::mutex _file_indexes_mutex;
     QHash<QString, int> _unindexed_dirs;
     int _unindexed_amount;
 
-    QVector<QThread *> _workerThreads;
+    QVector<QThread *> _worker_threads;
+    QThread *_watcher_thread;
+    std::unique_ptr<watcher> _watcher;
 
 };
 

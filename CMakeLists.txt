@@ -11,7 +11,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 find_package(Qt5Widgets REQUIRED)
 
-add_executable(grep main.cpp mainwindow.cpp file_counter.cpp file_indexer.cpp file_index.cpp string_finder.cpp)
+add_executable(grep main.cpp mainwindow.cpp file_counter.cpp file_indexer.cpp file_index.cpp string_finder.cpp watcher.cpp)
 
 qt5_use_modules(grep Widgets)
 include_directories("${PROJECT_SOURCE_DIR}/cmake-build-debug")

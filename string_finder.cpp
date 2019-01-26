@@ -4,7 +4,7 @@
 #include <QFile>
 #include <QTextStream>
 
-string_finder::string_finder(const QVector<file_index> &indexes, QString const &substring) : _indexes(indexes), _substring(substring) {}
+string_finder::string_finder(const QHash<QString, file_index> &indexes, QString const &substring) : _indexes(indexes), _substring(substring) {}
 
 string_finder::~string_finder() {}
 
@@ -23,7 +23,7 @@ void string_finder::startScanning() {
         trigrams.append(file_index::get_trigram(utf8bytes[i], utf8bytes[i + 1], utf8bytes[i + 2]));
     }
 
-    for (file_index const &index : _indexes) {
+    for (file_index const &index : _indexes.values()) {
         if (QThread::currentThread()->isInterruptionRequested()) {
             break;
         }

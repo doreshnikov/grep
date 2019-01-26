@@ -13,7 +13,8 @@
 #include <QtDebug>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow), _dirs(), _unindexed_dirs(),
-                                          _workerThreads(),
+                                          _worker_threads(),
+                                          _watcher(nullptr), _watcher_thread(nullptr),
                                           _unindexed_amount(0), _file_indexes() {
     ui->setupUi(this);
     setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, size(), qApp->desktop()->availableGeometry()));
@@ -34,6 +35,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     ui->treeWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);
     ui->treeWidget->setUniformRowHeights(true);
 
+    connect(ui->listWidget, &QListWidget::itemDoubleClicked,
+            this, &MainWindow::removeDirectory);
+
     connect(ui->action_Select_Directory, &QAction::triggered,
             this, &MainWindow::selectDirectory);
     connect(ui->action_Exit, &QAction::triggered,
@@ -49,11 +53,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWi
     connect(ui->lineEdit, &QLineEdit::returnPressed,
             ui->buttonSearch, &QPushButton::click);
 
+    _watcher = std::make_unique<watcher>();
+    _watcher_thread = new QThread();
+
+    _watcher->moveToThread(_watcher_thread);
+    _watcher_thread->start();
+
+    connect(_watcher.get(), &watcher::onFileChanged,
+            this, &MainWindow::onFileChanged);
+    connect(_watcher.get(), &watcher::onDirectoryChanged,
+            this, &MainWindow::onDirectoryChanged);
+
     reset_index_button();
 }
 
 void MainWindow::interrupt_workers() {
-    for (auto &workerThread : _workerThreads) {
+    for (auto &workerThread : _worker_threads) {
         if (workerThread != nullptr) {
             if (workerThread->isRunning()) {
                 workerThread->requestInterruption();
@@ -63,12 +78,12 @@ void MainWindow::interrupt_workers() {
         delete workerThread;
         workerThread = nullptr;
     }
-    _workerThreads.clear();
+    _worker_threads.clear();
 }
 
 QThread *MainWindow::request_new_thread() {
     QThread *thread = new QThread();
-    _workerThreads.append(thread);
+    _worker_threads.append(thread);
     return thread;
 }
 
@@ -113,6 +128,8 @@ void MainWindow::showAboutDialog() {
 }
 
 void MainWindow::update_status_bar() {
+    _file_indexes_mutex.lock();
+
     if (_unindexed_amount == 0) {
         ui->statusBar->showMessage(QString("Indexed files: %1").arg(_file_indexes.size()));
     } else if (_file_indexes.size() == 0) {
@@ -120,6 +137,8 @@ void MainWindow::update_status_bar() {
     } else {
         ui->statusBar->showMessage(QString("Indexed files: %1, unindexed: %2").arg(_file_indexes.size()).arg(_unindexed_amount));
     }
+
+    _file_indexes_mutex.unlock();
 }
 
 void MainWindow::reset_index_button() {
@@ -171,25 +190,44 @@ void MainWindow::startIndexing() {
     ui->buttonSearch->setDisabled(true);
     ui->buttonSearch->repaint();
 
-    for (auto const &dir : _dirs.keys()) {
-        QThread *workerThread = request_new_thread();
+    for (auto const &dir : _unindexed_dirs.keys()) {
+        QThread *worker_thread = request_new_thread();
         file_indexer *indexer = new file_indexer(dir);
-        indexer->moveToThread(workerThread);
+        indexer->moveToThread(worker_thread);
 
-        connect(workerThread, &QThread::started,
+        connect(worker_thread, &QThread::started,
                 indexer, &file_indexer::startIndexing);
         connect(indexer, &file_indexer::onComplete,
                 this, &MainWindow::onIndexComplete);
         connect(indexer, &file_indexer::onFileIndexed,
                 this, &MainWindow::receiveIndexedFile);
 
-        connect(workerThread, &QThread::finished,
+        connect(worker_thread, &QThread::finished,
                 indexer, &QObject::deleteLater);
         connect(indexer, &file_indexer::onError,
                 this, &MainWindow::receiveError);
 
-        workerThread->start();
+        worker_thread->start();
     }
+}
+
+void MainWindow::reindex(QString const &file_name) {
+    file_indexer *indexer = new file_indexer(file_name);
+    QThread *workerThread = new QThread();
+    indexer->moveToThread(workerThread);
+
+    connect(workerThread, &QThread::started,
+            indexer, &file_indexer::startIndexing);
+    connect(indexer, &file_indexer::onFileIndexed,
+            this, &MainWindow::receiveReindexedFile);
+    connect(indexer, &file_indexer::onError,
+            this, &MainWindow::receiveError);
+    connect(indexer, &file_indexer::onComplete,
+            workerThread, &QThread::quit);
+    connect(workerThread, &QThread::finished,
+            indexer, &QObject::deleteLater);
+
+    workerThread->start();
 }
 
 void MainWindow::stopIndexing() {
@@ -212,6 +250,7 @@ void MainWindow::stopIndexing() {
 }
 
 void MainWindow::onIndexComplete(QString const &dir) {
+    _watcher->add_path(dir);
     if (_dirs[dir] != nullptr) {
         _dirs[dir]->setTextColor(QColor(0, 50, 0));
         _unindexed_amount -= _unindexed_dirs[dir];
@@ -239,6 +278,8 @@ void MainWindow::startSearching() {
 
     QString substring = ui->lineEdit->text();
     QThread *workerThread = request_new_thread();
+    _file_indexes_mutex.lock();
+
     string_finder *finder = new string_finder(_file_indexes, substring);
     finder->moveToThread(workerThread);
 
@@ -260,6 +301,7 @@ void MainWindow::startSearching() {
 
 void MainWindow::stopSearching() {
     interrupt_workers();
+    _file_indexes_mutex.unlock();
 
     ui->buttonSearch->setText("Start searching");
     ui->buttonSearch->repaint();
@@ -276,11 +318,48 @@ void MainWindow::onSearchComplete() {
     stopSearching();
 }
 
-void MainWindow::receiveIndexedFile(const file_index &index) {
-    ui->progressBar->setValue(ui->progressBar->value() + 1);
-    if (!index.empty()) {
-        _file_indexes.append(index);
+void MainWindow::onFileChanged(const QString &file_name) {
+    _file_indexes_mutex.lock();
+
+    if (_file_indexes.contains(file_name)) {
+        _file_indexes.remove(file_name);
     }
+
+    _file_indexes_mutex.unlock();
+    if (QFileInfo(file_name).exists()) {
+        reindex(file_name);
+    }
+    ui->plainTextEdit_Error->appendPlainText(QString("file %1 changed").arg(file_name));
+}
+
+void MainWindow::onDirectoryChanged(const QString &dir_name) {
+    if (_dirs.contains(dir_name)) {
+        delete _dirs[dir_name];
+        _dirs.remove(dir_name);
+    }
+    ui->plainTextEdit_Error->appendPlainText(QString("dir %1 changed").arg(dir_name));
+}
+
+void MainWindow::receiveIndexedFile(const file_index &index) {
+    _watcher->add_path(index.get_file_path());
+    ui->progressBar->setValue(ui->progressBar->value() + 1);
+    _file_indexes_mutex.lock();
+
+    if (!index.empty()) {
+        _file_indexes[index.get_file_path()] = index;
+    }
+
+    _file_indexes_mutex.unlock();
+}
+
+void MainWindow::receiveReindexedFile(const file_index &index) {
+    _file_indexes_mutex.lock();
+
+    if (!index.empty()) {
+        _file_indexes[index.get_file_path()] = index;
+    }
+
+    _file_indexes_mutex.unlock();
 }
 
 void MainWindow::receiveInstances(const QString &file_name, const QVector<QString> &where) {
@@ -298,6 +377,31 @@ void MainWindow::receiveError(QString const &error) {
     ui->plainTextEdit_Error->appendHtml(error);
 }
 
+void MainWindow::removeDirectory(QListWidgetItem *item) {
+    item->setTextColor(QColor(255, 0, 0));
+    _file_indexes_mutex.lock();
+
+    QString dir = item->text();
+    QVector<QString> in_dir;
+    for (QString const &file_name : _file_indexes.keys()) {
+        if (file_name.startsWith(dir)) {
+            in_dir.append(file_name);
+        }
+    }
+
+    for (QString const &file_name : in_dir) {
+        _file_indexes.remove(file_name);
+    }
+    _dirs[dir];
+    delete item;
+
+    _file_indexes_mutex.unlock();
+    update_status_bar();
+}
+
 MainWindow::~MainWindow() {
     interrupt_workers();
+    _watcher_thread->quit();
+    _watcher_thread->wait();
+    delete _watcher_thread;
 }
