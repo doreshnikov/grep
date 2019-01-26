@@ -69,6 +69,7 @@ void file_indexer::index_file(file_index &index) {
 
             if (index.size() > BINARY_INDEX_SIZE) {
                 index.clear();
+                break;
             }
         }
     } else {
