@@ -11,8 +11,6 @@
 #include <QSet>
 #include <QThread>
 
-#include "../duplicates_scanner.h"
-
 class test : public QObject {
     Q_OBJECT
 
@@ -101,7 +99,7 @@ signals:
 
 public slots:
 
-    void receiveDuplicatesBucket(QVector<QString> const &);
+    void receiveResult(QVector<QString> const &);
     void receiveError(QString const &);
 
 private:

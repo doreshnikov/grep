@@ -259,6 +259,7 @@ void MainWindow::onIndexComplete(QString const &dir) {
     if (_unindexed_dirs.empty()) {
         ui->buttonIndex->setDisabled(true);
         stopIndexing();
+        ui->progressBar->setValue(ui->progressBar->maximum());
     }
 }
 
@@ -392,7 +393,7 @@ void MainWindow::removeDirectory(QListWidgetItem *item) {
     for (QString const &file_name : in_dir) {
         _file_indexes.remove(file_name);
     }
-    _dirs[dir];
+    _dirs.remove(dir);
     delete item;
 
     _file_indexes_mutex.unlock();
