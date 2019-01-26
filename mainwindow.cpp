@@ -155,6 +155,7 @@ void MainWindow::reset_index_button() {
 }
 
 void MainWindow::onCountComplete(QString const &dir, int amount, qint64 size) {
+    _file_indexes_mutex.unlock();
     QListWidgetItem *item = new QListWidgetItem(ui->listWidget);
     item->setText(dir);
     item->setTextColor(QColor(255, 0, 0));
