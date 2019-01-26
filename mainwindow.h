@@ -48,6 +48,10 @@ public slots:
     void receiveError(QString const &);
 
     void removeDirectory(QListWidgetItem *);
+    void onRemovingComplete(QString const &);
+    void onIndexedFileRemoved(QString const &);
+    void onIndexedDirectoryRemoved(QString const &);
+    void stopRemoving();
 
     void showAboutDialog();
 

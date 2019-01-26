@@ -7,6 +7,8 @@
 
 file_indexer::file_indexer(QString const &dir) : _root(dir) {}
 
+file_indexer::~file_indexer() {}
+
 void file_indexer::startIndexing() {
     if (QFileInfo(_root.absolutePath()).isFile()) {
         file_index index(_root.absolutePath());
@@ -48,20 +50,20 @@ void file_indexer::index_file(file_index &index) {
         std::size_t start = 0, end = 0;
 
         while ((end = start + file.read(buffer + start, BUFFER_SIZE - start)) != start) {
+            if (QThread::currentThread()->isInterruptionRequested()) {
+                index.clear();
+                return;
+            }
             if (start == 0) {
                 start = 2;
             }
-            for (std::size_t i = 0; i < end - 3; i++) {
+            for (std::size_t i = 0; i < end - 2; i++) {
                 if (buffer[i] == '\0') {
                     index.clear();
                     return;
                 }
 
                 index.insert(file_index::get_trigram(buffer[i], buffer[i + 1], buffer[i + 2]));
-                if (QThread::currentThread()->isInterruptionRequested()) {
-                    index.clear();
-                    return;
-                }
             }
 
             buffer[0] = buffer[end - 2];

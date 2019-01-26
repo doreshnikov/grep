@@ -3,6 +3,7 @@
 #include "file_counter.h"
 #include "file_indexer.h"
 #include "string_finder.h"
+#include "watch_index_remover.h"
 
 #include <QCommonStyle>
 #include <QDesktopWidget>
@@ -154,6 +155,7 @@ void MainWindow::onCountComplete(QString const &dir, int amount, qint64 size) {
     QListWidgetItem *item = new QListWidgetItem(ui->listWidget);
     item->setText(dir);
     item->setTextColor(QColor(255, 0, 0));
+
     _dirs.insert(dir, item);
 
     _unindexed_amount += amount;
@@ -186,6 +188,8 @@ void MainWindow::startIndexing() {
             this, &MainWindow::stopIndexing);
     disconnect(ui->lineEdit, &QLineEdit::returnPressed,
                ui->buttonSearch, &QPushButton::click);
+
+    _file_indexes_mutex.lock();
 
     ui->buttonSearch->setDisabled(true);
     ui->buttonSearch->repaint();
@@ -231,6 +235,7 @@ void MainWindow::reindex(QString const &file_name) {
 }
 
 void MainWindow::stopIndexing() {
+    _file_indexes_mutex.unlock();
     interrupt_workers();
 
     ui->buttonIndex->setText("Start indexing");
@@ -334,9 +339,11 @@ void MainWindow::onFileChanged(const QString &file_name) {
 }
 
 void MainWindow::onDirectoryChanged(const QString &dir_name) {
-    if (_dirs.contains(dir_name)) {
-        delete _dirs[dir_name];
-        _dirs.remove(dir_name);
+    if (!QFileInfo(dir_name).exists()) {
+        if (_dirs.contains(dir_name)) {
+            delete _dirs[dir_name];
+            _dirs.remove(dir_name);
+        }
     }
     ui->plainTextEdit_Error->appendPlainText(QString("dir %1 changed").arg(dir_name));
 }
@@ -344,13 +351,9 @@ void MainWindow::onDirectoryChanged(const QString &dir_name) {
 void MainWindow::receiveIndexedFile(const file_index &index) {
     _watcher->add_path(index.get_file_path());
     ui->progressBar->setValue(ui->progressBar->value() + 1);
-    _file_indexes_mutex.lock();
-
     if (!index.empty()) {
         _file_indexes[index.get_file_path()] = index;
     }
-
-    _file_indexes_mutex.unlock();
 }
 
 void MainWindow::receiveReindexedFile(const file_index &index) {
@@ -379,31 +382,102 @@ void MainWindow::receiveError(QString const &error) {
 }
 
 void MainWindow::removeDirectory(QListWidgetItem *item) {
-//    item->setTextColor(QColor(255, 0, 0));
-//    _file_indexes_mutex.lock();
+    if (!_file_indexes_mutex.try_lock()) {
+        return;
+    }
+    item->setTextColor(QColor(255, 0, 0));
+    QString dir = item->text();
+    _unindexed_dirs.insert(dir, 0);
 
-//    QString dir = item->text();
-//    QVector<QString> in_dir;
-//    for (QString const &file_name : _file_indexes.keys()) {
-//        if (file_name.startsWith(dir)) {
-//            in_dir.append(file_name);
-//        }
-//    }
+    ui->progressBar->setValue(0);
 
-//    for (QString const &file_name : in_dir) {
-//        _file_indexes.remove(file_name);
-//        _watcher->remove_path(in_dir);
-//    }
-//    _dirs.remove(dir);
-//    delete item;
+    ui->buttonIndex->setText("Abort removal");
+    ui->buttonIndex->repaint();
+    disconnect(ui->buttonIndex, &QPushButton::clicked,
+               this, &MainWindow::startIndexing);
+    connect(ui->buttonIndex, &QPushButton::clicked,
+            this, &MainWindow::stopRemoving);
+    disconnect(ui->lineEdit, &QLineEdit::returnPressed,
+               ui->buttonSearch, &QPushButton::click);
 
-//    if (_unindexed_dirs.contains(dir)) {
-//        _unindexed_amount -= _unindexed_dirs[dir];
-//        _unindexed_dirs.remove(dir);
-//    }
+    ui->buttonSearch->setDisabled(true);
+    ui->buttonSearch->repaint();
 
-//    _file_indexes_mutex.unlock();
-//    update_status_bar();
+    QThread *worker_thread = request_new_thread();
+    watch_index_remover *remover = new watch_index_remover(dir);
+    remover->moveToThread(worker_thread);
+
+    connect(worker_thread, &QThread::started,
+            remover, &watch_index_remover::startRemoving);
+    connect(remover, &watch_index_remover::onComplete,
+            this, &MainWindow::onRemovingComplete);
+    connect(remover, &watch_index_remover::onFileMet,
+            this, &MainWindow::onIndexedFileRemoved);
+    connect(remover, &watch_index_remover::onDirectoryMet,
+            this, &MainWindow::onIndexedDirectoryRemoved);
+
+    connect(worker_thread, &QThread::finished,
+            remover, &QObject::deleteLater);
+    connect(worker_thread, &QThread::finished,
+            this, &MainWindow::stopRemoving);
+
+    connect(remover, &watch_index_remover::onError,
+            this, &MainWindow::receiveError);
+
+    worker_thread->start();
+
+    ui->statusBar->showMessage(QString("Removing directory from indexes..."));
+}
+
+void MainWindow::stopRemoving() {
+    interrupt_workers();
+
+    ui->buttonIndex->setText("Start indexing");
+    ui->buttonIndex->repaint();
+    connect(ui->buttonIndex, &QPushButton::clicked,
+               this, &MainWindow::startIndexing);
+    disconnect(ui->buttonIndex, &QPushButton::clicked,
+            this, &MainWindow::stopRemoving);
+    ui->progressBar->setValue(0);
+
+    ui->buttonSearch->setDisabled(false);
+    ui->buttonSearch->repaint();
+    connect(ui->lineEdit, &QLineEdit::returnPressed,
+            ui->buttonSearch, &QPushButton::click);
+
+    _file_indexes_mutex.unlock();
+    update_status_bar();
+    reset_index_button();
+}
+
+void MainWindow::onRemovingComplete(const QString &dir) {
+    ui->plainTextEdit_Error->appendPlainText(QString("%1 removed").arg(dir));
+    stopRemoving();
+    delete _dirs[dir];
+    _dirs.remove(dir);
+    if (_unindexed_dirs.contains(dir)) {
+        _unindexed_amount -= _unindexed_dirs[dir];
+        _unindexed_dirs.remove(dir);
+    }
+
+    ui->progressBar->setValue(ui->progressBar->maximum());
+}
+
+void MainWindow::onIndexedFileRemoved(const QString &file_name) {
+    _watcher->remove_path(file_name);
+    _file_indexes.remove(file_name);
+}
+
+void MainWindow::onIndexedDirectoryRemoved(const QString &dir_name) {
+    _watcher->remove_path(dir_name);
+    if (_dirs.contains(dir_name)) {
+        delete _dirs[dir_name];
+        _dirs.remove(dir_name);
+    }
+    if (_unindexed_dirs.contains(dir_name)) {
+        _unindexed_amount -= _unindexed_dirs[dir_name];
+        _unindexed_dirs.remove(dir_name);
+    }
 }
 
 MainWindow::~MainWindow() {

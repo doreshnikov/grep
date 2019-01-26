@@ -16,7 +16,7 @@ void string_finder::startScanning() {
 
     QVector<quint32> trigrams;
     QByteArray utf8bytes = _substring.toUtf8();
-    for (int i = 0; i < utf8bytes.size() - 3; i++) {
+    for (int i = 0; i < utf8bytes.size() - 2; i++) {
         if (QThread::currentThread()->isInterruptionRequested()) {
             break;
         }

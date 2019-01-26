@@ -4,10 +4,11 @@
 
 Q_DECLARE_METATYPE(file_index)
 
+inline quint32 num(unsigned char c) {
+    return static_cast<quint32>(static_cast<int>(c));
+}
+
 quint32 file_index::get_trigram(unsigned char c1, unsigned char c2, unsigned char c3) {
-    static auto const num = [](unsigned char c) {
-        return static_cast<quint32>(static_cast<int>(c));
-    };
     quint32 n1 = num(c1), n2 = num(c2), n3 = num(c3);
     return (n1 << (16 * sizeof(char))) | (n2 << (8 * sizeof(char))) | (n3);
 }

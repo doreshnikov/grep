@@ -15,6 +15,7 @@ public:
     static size_t const BINARY_INDEX_SIZE = 20000;
 
     file_indexer(QString const &);
+    ~file_indexer();
 
 signals:
 
