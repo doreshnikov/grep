@@ -392,6 +392,7 @@ void MainWindow::removeDirectory(QListWidgetItem *item) {
 
     for (QString const &file_name : in_dir) {
         _file_indexes.remove(file_name);
+        _watcher->remove_path(in_dir);
     }
     _dirs.remove(dir);
     delete item;
