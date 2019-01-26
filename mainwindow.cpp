@@ -89,6 +89,9 @@ QThread *MainWindow::request_new_thread() {
 }
 
 void MainWindow::selectDirectory() {
+    if (!_file_indexes_mutex.try_lock()) {
+        return;
+    }
     QString _dir = QFileDialog::getExistingDirectoryUrl(this, "Please select a directory for indexing", QString(), QFileDialog::ShowDirsOnly).path();
     if (_dir == "" || _dir.isNull() || _dirs.contains(_dir)) {
         return;
@@ -129,17 +132,11 @@ void MainWindow::showAboutDialog() {
 }
 
 void MainWindow::update_status_bar() {
-//    _file_indexes_mutex.lock();
-
-    if (_unindexed_amount == 0) {
+    if (_file_indexes.size() != 0) {
         ui->statusBar->showMessage(QString("Indexed files: %1").arg(_file_indexes.size()));
-    } else if (_file_indexes.size() == 0) {
-        ui->statusBar->showMessage(QString("Unindexed files: %1").arg(_unindexed_amount));
     } else {
-        ui->statusBar->showMessage(QString("Indexed files: %1, unindexed: %2").arg(_file_indexes.size()).arg(_unindexed_amount));
+        ui->statusBar->showMessage(QString("Unindexed files: %1").arg(_unindexed_amount));
     }
-
-//    _file_indexes_mutex.unlock();
 }
 
 void MainWindow::reset_index_button() {
@@ -152,6 +149,7 @@ void MainWindow::reset_index_button() {
 }
 
 void MainWindow::onCountComplete(QString const &dir, int amount, qint64 size) {
+    _file_indexes_mutex.unlock();
     QListWidgetItem *item = new QListWidgetItem(ui->listWidget);
     item->setText(dir);
     item->setTextColor(QColor(255, 0, 0));
@@ -189,7 +187,7 @@ void MainWindow::startIndexing() {
     disconnect(ui->lineEdit, &QLineEdit::returnPressed,
                ui->buttonSearch, &QPushButton::click);
 
-//    _file_indexes_mutex.lock();
+    _file_indexes_mutex.lock();
 
     ui->buttonSearch->setDisabled(true);
     ui->buttonSearch->repaint();
@@ -235,7 +233,7 @@ void MainWindow::reindex(QString const &file_name) {
 }
 
 void MainWindow::stopIndexing() {
-//    _file_indexes_mutex.unlock();
+    _file_indexes_mutex.unlock();
     interrupt_workers();
 
     ui->buttonIndex->setText("Start indexing");
@@ -284,7 +282,7 @@ void MainWindow::startSearching() {
 
     QString substring = ui->lineEdit->text();
     QThread *workerThread = request_new_thread();
-//    _file_indexes_mutex.lock();
+    _file_indexes_mutex.lock();
 
     string_finder *finder = new string_finder(_file_indexes, substring);
     finder->moveToThread(workerThread);
@@ -307,7 +305,7 @@ void MainWindow::startSearching() {
 
 void MainWindow::stopSearching() {
     interrupt_workers();
-//    _file_indexes_mutex.unlock();
+    _file_indexes_mutex.unlock();
 
     ui->buttonSearch->setText("Start searching");
     ui->buttonSearch->repaint();
@@ -377,9 +375,9 @@ void MainWindow::receiveError(QString const &error) {
 }
 
 void MainWindow::removeDirectory(QListWidgetItem *item) {
-//    if (!_file_indexes_mutex.try_lock()) {
-//        return;
-//    }
+    if (!_file_indexes_mutex.try_lock()) {
+        return;
+    }
     item->setTextColor(QColor(255, 0, 0));
     QString dir = item->text();
     _unindexed_dirs.insert(dir, 0);
@@ -440,7 +438,7 @@ void MainWindow::stopRemoving() {
     connect(ui->lineEdit, &QLineEdit::returnPressed,
             ui->buttonSearch, &QPushButton::click);
 
-//    _file_indexes_mutex.unlock();
+    _file_indexes_mutex.unlock();
     update_status_bar();
     reset_index_button();
 }
