@@ -379,31 +379,31 @@ void MainWindow::receiveError(QString const &error) {
 }
 
 void MainWindow::removeDirectory(QListWidgetItem *item) {
-    item->setTextColor(QColor(255, 0, 0));
-    _file_indexes_mutex.lock();
+//    item->setTextColor(QColor(255, 0, 0));
+//    _file_indexes_mutex.lock();
 
-    QString dir = item->text();
-    QVector<QString> in_dir;
-    for (QString const &file_name : _file_indexes.keys()) {
-        if (file_name.startsWith(dir)) {
-            in_dir.append(file_name);
-        }
-    }
+//    QString dir = item->text();
+//    QVector<QString> in_dir;
+//    for (QString const &file_name : _file_indexes.keys()) {
+//        if (file_name.startsWith(dir)) {
+//            in_dir.append(file_name);
+//        }
+//    }
 
-    for (QString const &file_name : in_dir) {
-        _file_indexes.remove(file_name);
-        _watcher->remove_path(in_dir);
-    }
-    _dirs.remove(dir);
-    delete item;
+//    for (QString const &file_name : in_dir) {
+//        _file_indexes.remove(file_name);
+//        _watcher->remove_path(in_dir);
+//    }
+//    _dirs.remove(dir);
+//    delete item;
 
-    if (_unindexed_dirs.contains(dir)) {
-        _unindexed_amount -= _unindexed_dirs[dir];
-        _unindexed_dirs.remove(dir);
-    }
+//    if (_unindexed_dirs.contains(dir)) {
+//        _unindexed_amount -= _unindexed_dirs[dir];
+//        _unindexed_dirs.remove(dir);
+//    }
 
-    _file_indexes_mutex.unlock();
-    update_status_bar();
+//    _file_indexes_mutex.unlock();
+//    update_status_bar();
 }
 
 MainWindow::~MainWindow() {
