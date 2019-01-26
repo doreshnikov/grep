@@ -396,6 +396,11 @@ void MainWindow::removeDirectory(QListWidgetItem *item) {
     _dirs.remove(dir);
     delete item;
 
+    if (_unindexed_dirs.contains(dir)) {
+        _unindexed_amount -= _unindexed_dirs[dir];
+        _unindexed_dirs.remove(dir);
+    }
+
     _file_indexes_mutex.unlock();
     update_status_bar();
 }
