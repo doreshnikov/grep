@@ -359,7 +359,7 @@ void MainWindow::receiveReindexedFile(const file_index &index) {
 void MainWindow::receiveInstances(const QString &file_name, const QVector<QString> &where) {
     QTreeWidgetItem *item = new QTreeWidgetItem(ui->treeWidget);
     item->setText(0, file_name);
-    item->setText(1, QString::number(where.size()));
+    item->setText(1, where.size() > 50 ? QString(">50") : QString::number(where.size()));
 
     for (QString const &line : where) {
         QTreeWidgetItem *child = new QTreeWidgetItem(item);

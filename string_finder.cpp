@@ -78,12 +78,15 @@ void string_finder::scan_file(const QString &file_name) {
                     if (next_line != -1) {
                         instance.truncate(instance.indexOf('\n'));
                     }
-                    result.push_back(instance);
+                    result.append(instance);
                 }
             }
 
             global_index += buffer1.size();
             buffer1 = std::move(buffer2);
+            if (result.size() > 50) {
+                break;
+            }
         }
 
         if (result.size() != 0) {
