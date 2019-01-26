@@ -94,6 +94,7 @@ void MainWindow::selectDirectory() {
     }
     QString _dir = QFileDialog::getExistingDirectoryUrl(this, "Please select a directory for indexing", QString(), QFileDialog::ShowDirsOnly).path();
     if (_dir == "" || _dir.isNull() || _dirs.contains(_dir)) {
+        _file_indexes_mutex.unlock();
         return;
     }
     _unindexed_dirs.insert(_dir, 0);
