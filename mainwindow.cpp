@@ -323,20 +323,17 @@ void MainWindow::onSearchComplete() {
 }
 
 void MainWindow::onFileChanged(const QString &file_name) {
-//    _file_indexes_mutex.lock();
-
     if (_file_indexes.contains(file_name)) {
         _file_indexes.remove(file_name);
     }
     if (QFileInfo(file_name).exists()) {
         reindex(file_name);
     }
-//    _file_indexes_mutex.unlock();
     ui->plainTextEdit_Error->appendPlainText(QString("file %1 changed").arg(file_name));
 }
 
 void MainWindow::onDirectoryChanged(const QString &dir_name) {
-    if (!QFileInfo(dir_name).exists()) {
+    if (!QDir(dir_name).exists()) {
         if (_dirs.contains(dir_name)) {
             delete _dirs[dir_name];
             _dirs.remove(dir_name);
